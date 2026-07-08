@@ -27,7 +27,7 @@ def load_briefs():
                 items = json.loads(json_path.read_text(encoding="utf-8"))
             except Exception:
                 items = []
-        top = items[:10]
+        top = parse_top_from_markdown(md_path, items)
         source_counts = Counter(item.get("source", "未分类") for item in items)
         briefs.append(
             {
@@ -41,6 +41,26 @@ def load_briefs():
             }
         )
     return briefs
+
+
+def parse_top_from_markdown(md_path, fallback_items):
+    if not md_path.exists():
+        return fallback_items[:10]
+    text = md_path.read_text(encoding="utf-8")
+    block = text.split("## 今日头条 / 必读 10 条", 1)
+    if len(block) < 2:
+        return fallback_items[:10]
+    block = block[1].split("## 按来源分组", 1)[0]
+    matches = re.findall(r"^\d+\.\s+\[([^\]]+)\]\(([^)]+)\)", block, flags=re.M)
+    by_url = {item.get("url"): item for item in fallback_items}
+    top = []
+    for title, url in matches[:10]:
+        item = dict(by_url.get(url, {}))
+        item.setdefault("title", title)
+        item.setdefault("url", url)
+        item.setdefault("source", "")
+        top.append(item)
+    return top or fallback_items[:10]
 
 
 def render_index(briefs):
